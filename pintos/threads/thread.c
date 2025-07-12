@@ -28,6 +28,10 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+
+static struct list sleep_list;
+
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -109,6 +113,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -395,8 +400,8 @@ kernel_thread (thread_func *function, void *aux) {
 }
 
 
-/* Does basic initialization of T as a blocked thread named
-   NAME. */
+/* Does basic initialization of T as a blocked thread named NAME. */
+/* T라는 스레드 구조체를 초기화하면서 상태는 BLOCKED로 설정하고, 이름도 함꼐 지정해주는 --> 실행 대기 큐에 들어가기 전에 수행 */
 static void
 init_thread (struct thread *t, const char *name, int priority) {
 	ASSERT (t != NULL);
@@ -588,3 +593,41 @@ allocate_tid (void) {
 
 	return tid;
 }
+
+/// @brief 기준 정렬함수 - wakeup_tick이 작은 스레드가 우선 순위
+/// @param a 
+/// @param b 
+/// @param UNUSED 
+/// @return 
+bool wakeup_tick_less(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	struct thread *t1 = list_entry(a, struct thread, elem);
+	struct thread *t2 = list_entry(b, struct thread, elem);
+
+	return t1->wakeup_tick < t2->wakeup_tick;
+}
+
+//thread_sleep
+/*
+	현재 스레드가 유효 스레드가 아닌 경우, 호출자 스레드 상태를 BLOCKED로 변경
+	로컬 틱을 저장하여 깨웁니다.
+	schedule()를 호출
+
+	스레드 목록을 조작할 때는 인터럽트를 비활성화 하세요.
+*/
+void thread_sleep(int64_t ticks){
+	struct thread *curr = thread_current();
+	enum intr_level old_level;
+
+	if(curr != idle_thread){
+		old_level = intr_disable();
+
+		curr->wakeup_tick = ticks;
+		list_insert_ordered (&sleep_list, &curr->elem, wakeup_tick_less, NULL);
+
+		thread_block();
+
+		intr_set_level(old_level);
+
+	}
+}
+

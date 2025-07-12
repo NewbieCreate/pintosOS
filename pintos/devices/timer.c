@@ -29,6 +29,8 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 
+
+
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -87,14 +89,23 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
-/* Suspends execution for approximately TICKS timer ticks. */
+/* 
+	Suspends execution for approximately TICKS timer ticks. 
+	- 현재 실행 중인 스레드를 슬립 리스트에 등록 
+	- 그 스레드는 BLOCKED 상태로 만든다.
+	- 다른 스레드가 CPU를 사용할 수 있도록 schedule() 호출
+	- 시간이 흐르면서, 타이머 인터럽트가 매 tick마다 sleep_list를 확인하고, 꺨 시점이 스레드를 READY로 전환
+*/
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
+
+	if(timer_elapsed(start) < ticks)
+		thread_sleep(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -121,11 +132,23 @@ timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	/*
+		추가할 코드 :
+		수면 목록과 글로벌 틱을 확인합니다.
+		꺠울 쓰레드를 찾습니다.
+		필요한 경우 ready_list로 이동합니다.
+		글로벌 틱을 업데이트 합니다.
+	*/
+
+	
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

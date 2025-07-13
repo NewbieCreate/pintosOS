@@ -19,6 +19,15 @@
 **/bin/
 **/obj/
 **/output/
+
+# Pintos 테스트 결과 파일
+.test_status
+.test_output/
+*.output
+*.result
+*.status
+*.diff
+
 # core dump
 core
 

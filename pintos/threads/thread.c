@@ -28,6 +28,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* 슬립 리스트 선언 */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -108,6 +111,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list); // 초기화
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -302,10 +306,24 @@ thread_yield (void) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	if (curr != idle_thread)
+	if (curr != idle_thread) // 참고
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+/* 구현해야 할 thread_sleep 함수 */
+void
+thread_sleep (int64_t ticks) {
+	/* 현재 스레드가 유휴 스레드가 아닌 경우, = idle 스레드
+	호출자 스레드의 상태를 BLOCKED로 변경합니다,
+	로컬 틱을 저장하여 깨웁니다,
+	필요한 경우 글로벌 틱을 업데이트합니다,
+	그리고 schedule()  을 호출합니다.*/
+    /* 스레드 목록을 조작할 때는 인터럽트를 비활성화하세요! */
+	struct thread *curr = thread_current (); 
+	if (curr != idle_thread) // 현재 스레드가 유후 스레드가 아닌 경우
+		curr->status = THREAD_BLOCKED;
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */

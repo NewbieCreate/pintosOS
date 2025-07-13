@@ -28,7 +28,7 @@ static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
-extern struct list sleep_list;
+extern struct list *get_sleep_list(void);
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -174,13 +174,13 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick();		// 현재 실행 중인 쓰레드의 시간 관련 처리
 
 	// sleep_list를 순회하며 깰 애들 찾기
-	while(!list_empty(&sleep_list)){
-		struct list_elem *e  = list_front (&sleep_list);
+	while(!list_empty(get_sleep_list())){
+		struct list_elem *e  = list_front (get_sleep_list());
 		struct thread *t = list_entry(e, struct thread, elem);
 
 		if(t->wakeup_tick <= ticks){
 			// wakeup 해야함
-			list_pop_front(&sleep_list);
+			list_pop_front(get_sleep_list());
 			thread_unblock(t); 
 		} else {
 			break;

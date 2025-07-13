@@ -29,7 +29,11 @@
 static struct list ready_list;
 
 /* 슬립 리스트 선언 */
-struct list sleep_list;
+static struct list sleep_list;
+
+struct list *get_sleep_list(void) {
+    return &sleep_list; 
+}
 
 /* Idle thread. */
 static struct thread *idle_thread;

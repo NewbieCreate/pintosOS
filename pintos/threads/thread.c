@@ -325,46 +325,35 @@ bool check_struct(const struct list_elem *a, struct list_elem *b, void *aux){
 	return cur->wakeup_tick < next->wakeup_tick;
 }
 
-/*현재 스레드 잠재우는 함수*/
 void thread_sleep(int64_t ticks) {
-	/* 스레드 구조체의 현재를 실행중인 스레드값을 둔다. */
-	 struct thread *cur = thread_current();
-	 /* 현재 스레드가 유휴스레드라면 그대로 리턴처리 한다. */
-	 if (cur == idle_thread) return;
-	 /* 인터럽트상태를 비활성화하고 이전의 인터럽트 상태를 저장한다. */
-	 enum intr_level old_level = intr_disable();
-	 /* 현재스레드의 wakeup_tick을 ticks 시간에 깨도록 설정한다. */
-	 cur->wakeup_tick = ticks;
-	 /* sleep_list의 맨 뒤에 넣어두고 스케줄러에 제외시킨다. */
-	 list_insert_ordered(&sleep_list, &cur->elem, check_struct, NULL);
-	 intr_set_level(old_level); 
-	 /*unblock 으로 깨울때까지 대기한다.*/
-	 thread_block();
+    struct thread *cur = thread_current();
+    if (cur == idle_thread) return;
+    int64_t wakeup_time = timer_ticks() + ticks;  
+    enum intr_level old_level = intr_disable();
+    cur->wakeup_tick = wakeup_time;
+    list_insert_ordered(&sleep_list, &cur->elem, check_struct, NULL);
+    thread_block();
+    intr_set_level(old_level);
 }
 
-void thread_wakeup(int64_t current_ticks)
-{
-	enum intr_level old_level = intr_disable();
-	// sleep_list에서 깨어날 시간이 된 스레드들을 깨움
-	struct list_elem *e, *next;
-	for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next)
-	{
-		next = list_next(e); // 미리 다음 원소 저장 (제거 때문에)
-		struct thread *t = list_entry(e, struct thread, elem);
+// void thread_wakeup(int64_t current_ticks)
+// {
+//     enum intr_level old_level = intr_disable();
+//     struct list_elem *e = list_begin(&sleep_list);
 
-		// 깨어날 시간이 되었는지 확인
-		if (t->wakeup_tick <= current_ticks)
-		{
-			// sleep_list에서 제거
-			list_remove(e);
-			// ready_list에 추가
-			// thread_unblock() 대신 직접 ready_list에 추가
-            list_push_back(&ready_list, &t->elem);
-            t->status = THREAD_READY; // ready 상태로
-		}
-	}
-	intr_set_level(old_level);
-}
+//     while (e != list_end(&sleep_list)) {
+//         struct thread *t = list_entry(e, struct thread, elem);
+//         struct list_elem *next = list_next(e);  // 미리 next 저장
+
+//         if (t->wakeup_tick <= current_ticks) {
+//             list_remove(e);
+//             thread_unblock(t);  // ✅ 우선순위 보장 + 상태 변경 포함
+//         }
+//         e = next;
+//     }
+
+//     intr_set_level(old_level);
+// }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)

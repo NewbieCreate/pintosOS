@@ -17,7 +17,7 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
-/* Number of timer ticks since OS booted. */
+/* OS가 부팅된 이후 경과한 타이머 틱 수입니다. */
 static int64_t ticks;
 
 /* Number of loops per timer tick.
@@ -41,7 +41,6 @@ timer_init (void) {
 	outb (0x43, 0x34);    /* CW: counter 0, LSB then MSB, mode 2, binary. */
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
-
 	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -70,37 +69,38 @@ timer_calibrate (void) {
 	printf ("%'"PRIu64" loops/s.\n", (uint64_t) loops_per_tick * TIMER_FREQ);
 }
 
-/* Returns the number of timer ticks since the OS booted. */
+/* OS가 부팅된 이후 경과한 타이머 틱 수를 반환한다 */
 int64_t
 timer_ticks (void) {
+	/* 현재 인터럽트 상태를 old_level에 저장한 뒤, 인터럽트를 비활성화한다 */
 	enum intr_level old_level = intr_disable ();
+	 /* 전역 변수 ticks 값을 t에 저장한다 (critical section 보호) */
 	int64_t t = ticks;
+	  /* 이전 인터럽트 상태로 복원한다 */
 	intr_set_level (old_level);
+	/* 컴파일러의 최적화로 인한 순서 변경을 방지한다 */
 	barrier ();
+	/* 경과한 틱 수 t를 반환한다 */
 	return t;
 }
 
-/* Returns the number of timer ticks elapsed since THEN, which
-   should be a value once returned by timer_ticks(). */
+/* timer_ticks()가 한 번 반환했던 값을 기반으로, THEN 이후 경과한 타이머 틱 수를 반환한다. */
 int64_t
 timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
-/* Suspends execution for approximately TICKS timer ticks. 
-지금의 구현은 이 함수를 호출한 스레드는 주어진 틱이 지나면 ready_list에 삽입됨 . 
-목표는 blocked 상태를 사용하는 것이며, yield() 사용을 sleep() 사용 및 wakeup() 사용으로 대체해야 함 
-수면 대기열 sleep_list에 삽입해야 함. */
+
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks (); // 현재 틱의 값을 반환
+	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	// while (timer_elapsed (start) < ticks) // timer_elapsed = 시작 이후 경과한 틱 수를 반환
-	// 	thread_yield (); // CPU의 수율을 산출하고 스레드를 ready_list에 삽입함
 
-	if(timer_elapsed (start) < ticks)
-		thread_sleep(start + ticks); // 구현해야 함
+	if(timer_elapsed (start) < ticks){
+		thread_sleep(start + ticks); //직접 구현하기
+	}
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -127,19 +127,30 @@ timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. */
+
+
+
+/* 타이머 인터럽트가 발생했을 때 실행되는 핸들러 함수이다. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;
-	thread_tick ();
-
-	/* 추가할 코드: 
-	수면 목록과 글로벌 틱을 확인합니다.
-	깨울 스레드를 찾습니다,
-	필요한 경우 준비 목록으로 이동합니다.
-	글로벌 틱을 업데이트합니다.
-	*/
-
+	ticks++;  /* 전체 시스템 tick 수 증가 */
+	printf("tick: %lld\n", ticks);
+	thread_tick (); /* 실행 중인 프로세스의 cpu 사용량 업데이트*/
+    /* 현재시간 불러오는 타이머틱 */
+    int64_t now =timer_ticks(); 
+	/* 슬립 리스트 불러오기 */
+	struct list *sleep_list = get_sleep_list();
+	/* 슬립리스트 안에 원소가 비지 않을때까지 반복한다. */
+	while(!list_empty(sleep_list)){
+		/* 리스트의 맨 앞 스레드 추출 (wake-up tick이 가장 이른 스레드) */
+		struct thread *cur = list_entry(list_front(sleep_list), struct thread, elem);
+		/* 아직 깨울 시간이 아니라면 더 이상 검사할 필요 없음 (정렬되어 있기 때문) */
+		if(cur->wakeup_tick > now) break;
+		/* 깨어날 시간이 된 스레드 → 리스트에서 제거하고 unblock */
+		list_pop_front(sleep_list);
+		/* unblock 처리 하고 CPU 제어권을 넘긴다. */
+		thread_unblock(cur);
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

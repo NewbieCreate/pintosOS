@@ -328,7 +328,7 @@ void thread_sleep(int64_t ticks)
 	{											   // 현재 스레드가 유후 스레드가 아닌 경우
 		curr->wakeup_tick = ticks; // 매개변수로 받은 시간
 
-		list_push_back(&sleep_list, &curr->elem);
+		list_push_back(&sleep_list, &curr->elem); // 맨 뒤에 삽입
 
 		curr->status = THREAD_BLOCKED; // 현재 스레드 상태를 BLOCKED로 변경
 
@@ -340,6 +340,7 @@ void thread_sleep(int64_t ticks)
 
 void thread_wakeup(int64_t current_ticks)
 {
+	enum intr_level old_level = intr_disable();
 	// sleep_list에서 깨어날 시간이 된 스레드들을 깨움
 	struct list_elem *e, *next;
 	for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next)
@@ -352,13 +353,13 @@ void thread_wakeup(int64_t current_ticks)
 		{
 			// sleep_list에서 제거
 			list_remove(e);
-			// ready_list에 추가 (unblock)
-			//thread_unblock(t);
+			// ready_list에 추가
 			// thread_unblock() 대신 직접 ready_list에 추가
             list_push_back(&ready_list, &t->elem);
-            t->status = THREAD_READY;
+            t->status = THREAD_READY; // ready 상태로
 		}
 	}
+	intr_set_level(old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */

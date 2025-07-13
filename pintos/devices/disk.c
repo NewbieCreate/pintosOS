@@ -22,6 +22,7 @@
 #define reg_status(CHANNEL) ((CHANNEL)->reg_base + 7)   /* Status (r/o). */
 #define reg_command(CHANNEL) reg_status (CHANNEL)       /* Command (w/o). */
 
+
 /* ATA control block port addresses.
    (If we supported non-legacy ATA controllers this would not be
    flexible enough, but it's fine for what we do.) */

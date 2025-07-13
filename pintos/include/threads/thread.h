@@ -145,4 +145,5 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+void thread_sleep(int64_t ticks);
 #endif /* threads/thread.h */

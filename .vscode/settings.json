@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "timer.h": "c",
-        "thread.h": "c"
+        "thread.h": "c",
+        "inttypes.h": "c",
+        "round.h": "c",
+        "interrupt.h": "c",
+        "synch.h": "c"
     }
 }

@@ -29,10 +29,8 @@
 static struct list ready_list;
 
 /* 슬립 리스트 선언 */
-static struct list sleep_list;
-struct list *get_sleep_list(void){
-	return &sleep_list;
-}
+struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -315,7 +313,7 @@ void thread_yield(void)
 }
 
 /* 비교 함수 */
-bool check_struct(const struct list_elem *a, struct list_elem *b, void *aux){
+bool check_struct(const struct list_elem *a, const struct list_elem *b, void *aux){
 	/* a와 b가 각각 가리키는 thread 구조체를 얻는다 */
 	struct thread *cur = list_entry(a, struct thread, elem);
 	struct thread *next = list_entry(b, struct thread, elem);
@@ -325,15 +323,33 @@ bool check_struct(const struct list_elem *a, struct list_elem *b, void *aux){
 	return cur->wakeup_tick < next->wakeup_tick;
 }
 
-void thread_sleep(int64_t ticks) {
-    struct thread *cur = thread_current();
-    if (cur == idle_thread) return;
-    int64_t wakeup_time = timer_ticks() + ticks;  
-    enum intr_level old_level = intr_disable();
-    cur->wakeup_tick = wakeup_time;
-    list_insert_ordered(&sleep_list, &cur->elem, check_struct, NULL);
-    thread_block();
-    intr_set_level(old_level);
+// void thread_sleep(int64_t ticks) {
+// 	ASSERT(intr_get_level() == INTR_OFF);
+
+//     struct thread *cur = thread_current();
+//     if (cur == idle_thread) return;
+
+//     cur->wakeup_tick = ticks;
+//     list_insert_ordered(&sleep_list, &cur->elem, check_struct, NULL);
+
+// 	thread_block();
+// 	// intr_set_level(old_level);
+// }
+void thread_sleep(int64_t ticks){
+	struct thread *curr = thread_current();
+	enum intr_level old_level;
+
+	if(curr != idle_thread){
+		old_level = intr_disable();
+
+		curr->wakeup_tick = ticks;
+		list_insert_ordered (&sleep_list, &curr->elem, check_struct, NULL);
+
+		thread_block();
+
+		intr_set_level(old_level);
+
+	}
 }
 
 // void thread_wakeup(int64_t current_ticks)

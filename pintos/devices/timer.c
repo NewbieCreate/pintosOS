@@ -28,7 +28,7 @@ static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
-
+extern struct list sleep_list;
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -91,16 +91,29 @@ timer_elapsed (int64_t then) {
 }
 
 
+// void timer_sleep(int64_t ticks) {
+//     int64_t start = timer_ticks();
+
+//     ASSERT(intr_get_level() == INTR_ON);
+//     enum intr_level old_level = intr_disable();  // 인터럽트 끄기
+
+//     if (timer_elapsed(start) < ticks) {
+//         thread_sleep(start + ticks); // 인터럽트 꺼진 상태에서 sleep
+//     }
+
+//     intr_set_level(old_level);  // 인터럽트 이전 상태로 복구
+// }
+
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
 
-	if(timer_elapsed (start) < ticks){
-		thread_sleep(start + ticks); //직접 구현하기
-	}
-
+	if(timer_elapsed(start) < ticks)
+		thread_sleep(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -131,26 +144,49 @@ timer_print_stats (void) {
 
 
 /* 타이머 인터럽트가 발생했을 때 실행되는 핸들러 함수이다. */
+// static void
+// timer_interrupt (struct intr_frame *args UNUSED) {
+//     enum intr_level old_level = intr_disable();  // 인터럽트 비활성화
+// 	ticks++;  /* 전체 시스템 tick 수 증가 */
+// 	// printf("tick: %lld\n", ticks);
+// 	thread_tick (); /* 실행 중인 프로세스의 cpu 사용량 업데이트*/
+//     /* 현재시간 불러오는 타이머틱 */
+// 	int64_t now =ticks;
+
+// 	/* 슬립 리스트 불러오기 */
+// 	struct list *sleep_list = get_sleep_list();
+// 	/* 슬립리스트 안에 원소가 비지 않을때까지 반복한다. */
+// 	while(!list_empty(sleep_list)){
+// 		/* 리스트의 맨 앞 스레드 추출 (wake-up tick이 가장 이른 스레드) */
+// 		struct thread *t = list_entry(list_front(sleep_list), struct thread, elem);
+// 		/* 아직 깨울 시간이 아니라면 더 이상 검사할 필요 없음 (정렬되어 있기 때문) */
+// 		if(t->wakeup_tick > now) break;
+// 		/* 깨어날 시간이 된 스레드 → 리스트에서 제거하고 unblock */
+// 		list_pop_front(sleep_list);
+// 		/* unblock 처리 하고 CPU 제어권을 넘긴다. */
+// 		thread_unblock(t);
+// 	}
+// 	intr_set_level(old_level);
+// }
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;  /* 전체 시스템 tick 수 증가 */
-	printf("tick: %lld\n", ticks);
-	thread_tick (); /* 실행 중인 프로세스의 cpu 사용량 업데이트*/
-    /* 현재시간 불러오는 타이머틱 */
-    int64_t now =timer_ticks(); 
-	/* 슬립 리스트 불러오기 */
-	struct list *sleep_list = get_sleep_list();
-	/* 슬립리스트 안에 원소가 비지 않을때까지 반복한다. */
-	while(!list_empty(sleep_list)){
-		/* 리스트의 맨 앞 스레드 추출 (wake-up tick이 가장 이른 스레드) */
-		struct thread *cur = list_entry(list_front(sleep_list), struct thread, elem);
-		/* 아직 깨울 시간이 아니라면 더 이상 검사할 필요 없음 (정렬되어 있기 때문) */
-		if(cur->wakeup_tick > now) break;
-		/* 깨어날 시간이 된 스레드 → 리스트에서 제거하고 unblock */
-		list_pop_front(sleep_list);
-		/* unblock 처리 하고 CPU 제어권을 넘긴다. */
-		thread_unblock(cur);
+	ticks++;		// 전역 tick 수 증가 (현재까지 지난 타이머 틱 수)
+	thread_tick();		// 현재 실행 중인 쓰레드의 시간 관련 처리
+
+	// sleep_list를 순회하며 깰 애들 찾기
+	while(!list_empty(&sleep_list)){
+		struct list_elem *e  = list_front (&sleep_list);
+		struct thread *t = list_entry(e, struct thread, elem);
+
+		if(t->wakeup_tick <= ticks){
+			// wakeup 해야함
+			list_pop_front(&sleep_list);
+			thread_unblock(t); 
+		} else {
+			break;
+		}
 	}
+	
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

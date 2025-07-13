@@ -145,4 +145,9 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+
+bool check_struct(const struct list_elem *a, struct list_elem *b, void *aux);
+void thread_sleep(int64_t ticks);
+struct list *get_sleep_list(void);
+
 #endif /* threads/thread.h */

@@ -30,7 +30,9 @@ static struct list ready_list;
 
 /* 슬립 리스트 선언 */
 static struct list sleep_list;
-
+struct list *get_sleep_list(void){
+	return &sleep_list;
+}
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -312,30 +314,32 @@ void thread_yield(void)
 	intr_set_level(old_level);
 }
 
-/* 구현해야 할 thread_sleep 함수 */
-void thread_sleep(int64_t ticks)
-{
-	/* 현재 스레드가 유휴 스레드가 아닌 경우, = idle 스레드
-	호출자 스레드의 상태를 BLOCKED로 변경합니다,
-	로컬 틱을 저장하여 깨웁니다,
-	필요한 경우 글로벌 틱을 업데이트합니다,
-	그리고 schedule() 을 호출합니다.*/
-	/* 스레드 목록을 조작할 때는 인터럽트를 비활성화하세요! */
-	enum intr_level old_level = intr_disable(); // 인터럽트 비활성화
+/* 비교 함수 */
+bool check_struct(const struct list_elem *a, struct list_elem *b, void *aux){
+	/* a와 b가 각각 가리키는 thread 구조체를 얻는다 */
+	struct thread *cur = list_entry(a, struct thread, elem);
+	struct thread *next = list_entry(b, struct thread, elem);
 
-	struct thread *curr = thread_current(); // 현재 스레드
-	if (curr != idle_thread)
-	{											   // 현재 스레드가 유후 스레드가 아닌 경우
-		curr->wakeup_tick = ticks; // 매개변수로 받은 시간
+	/* wakeup_tick이 더 작은 스레드를 우선 순위로 하여 정렬한다
+   → cur이 더 일찍 깨어나야 한다면 true 반환 */
+	return cur->wakeup_tick < next->wakeup_tick;
+}
 
-		list_push_back(&sleep_list, &curr->elem); // 맨 뒤에 삽입
-
-		curr->status = THREAD_BLOCKED; // 현재 스레드 상태를 BLOCKED로 변경
-
-		schedule(); // schedule() 호출
-	}
-
-	intr_set_level(old_level); // 인터럽트 복원
+/*현재 스레드 잠재우는 함수*/
+void thread_sleep(int64_t ticks) {
+	/* 스레드 구조체의 현재를 실행중인 스레드값을 둔다. */
+	 struct thread *cur = thread_current();
+	 /* 현재 스레드가 유휴스레드라면 그대로 리턴처리 한다. */
+	 if (cur == idle_thread) return;
+	 /* 인터럽트상태를 비활성화하고 이전의 인터럽트 상태를 저장한다. */
+	 enum intr_level old_level = intr_disable();
+	 /* 현재스레드의 wakeup_tick을 ticks 시간에 깨도록 설정한다. */
+	 cur->wakeup_tick = ticks;
+	 /* sleep_list의 맨 뒤에 넣어두고 스케줄러에 제외시킨다. */
+	 list_insert_ordered(&sleep_list, &cur->elem, check_struct, NULL);
+	 intr_set_level(old_level); 
+	 /*unblock 으로 깨울때까지 대기한다.*/
+	 thread_block();
 }
 
 void thread_wakeup(int64_t current_ticks)

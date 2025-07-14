@@ -312,6 +312,17 @@ void thread_yield(void)
 	intr_set_level(old_level);
 }
 
+/* 비교 함수 */
+bool check_struct(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    /* a와 b가 각각 가리키는 thread 구조체를 얻는다 */
+    struct thread *thread_a = list_entry(a, struct thread, elem);
+    struct thread *thread_b = list_entry(b, struct thread, elem);
+    
+    /* wakeup_tick이 더 작은 스레드를 우선 순위로 하여 정렬한다 */
+    return thread_a->wakeup_tick < thread_b->wakeup_tick;
+}
+
 /* 구현해야 할 thread_sleep 함수 */
 void thread_sleep(int64_t ticks)
 {
@@ -328,11 +339,13 @@ void thread_sleep(int64_t ticks)
 	{											   // 현재 스레드가 유후 스레드가 아닌 경우
 		curr->wakeup_tick = ticks; // 매개변수로 받은 시간
 
-		list_push_back(&sleep_list, &curr->elem); // 맨 뒤에 삽입
+		//list_push_back(&sleep_list, &curr->elem); // 맨 뒤에 삽입
+		list_insert_ordered (&sleep_list, &curr->elem, check_struct, NULL);
 
-		curr->status = THREAD_BLOCKED; // 현재 스레드 상태를 BLOCKED로 변경
+		thread_block();
+		//curr->status = THREAD_BLOCKED; // 현재 스레드 상태를 BLOCKED로 변경
 
-		schedule(); // schedule() 호출
+		//schedule(); // schedule() 호출
 	}
 
 	intr_set_level(old_level); // 인터럽트 복원
@@ -340,26 +353,18 @@ void thread_sleep(int64_t ticks)
 
 void thread_wakeup(int64_t current_ticks)
 {
-	enum intr_level old_level = intr_disable();
-	// sleep_list에서 깨어날 시간이 된 스레드들을 깨움
-	struct list_elem *e, *next;
-	for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next)
-	{
-		next = list_next(e); // 미리 다음 원소 저장 (제거 때문에)
-		struct thread *t = list_entry(e, struct thread, elem);
-
-		// 깨어날 시간이 되었는지 확인
-		if (t->wakeup_tick <= current_ticks)
-		{
-			// sleep_list에서 제거
-			list_remove(e);
-			// ready_list에 추가
-			// thread_unblock() 대신 직접 ready_list에 추가
-            list_push_back(&ready_list, &t->elem);
-            t->status = THREAD_READY; // ready 상태로
-		}
-	}
-	intr_set_level(old_level);
+	// 정렬된 리스트이므로 앞에서부터 처리
+    while (!list_empty(&sleep_list)) {
+        struct list_elem *e = list_front(&sleep_list);
+        struct thread *t = list_entry(e, struct thread, elem);
+        
+        if (t->wakeup_tick <= current_ticks) {
+            list_pop_front(&sleep_list);  // ✓ 여기서는 pop_front가 적절
+            thread_unblock(t);
+        } else {
+            break;  // 정렬되어 있으므로 더 이상 확인 불필요
+        }
+    }
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */

@@ -139,6 +139,8 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	필요한 경우 준비 목록으로 이동합니다.
 	글로벌 틱을 업데이트합니다.
 	*/
+	thread_wakeup(ticks);
+	
 
 }
 

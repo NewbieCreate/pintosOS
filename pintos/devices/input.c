@@ -18,7 +18,7 @@ void
 input_putc (uint8_t key) {
 	ASSERT (intr_get_level () == INTR_OFF);
 	ASSERT (!intq_full (&buffer));
-
+	
 	intq_putc (&buffer, key);
 	serial_notify ();
 }

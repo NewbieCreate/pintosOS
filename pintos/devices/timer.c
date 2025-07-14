@@ -87,14 +87,20 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
-/* Suspends execution for approximately TICKS timer ticks. */
+/* Suspends execution for approximately TICKS timer ticks. 
+지금의 구현은 이 함수를 호출한 스레드는 주어진 틱이 지나면 ready_list에 삽입됨 . 
+목표는 blocked 상태를 사용하는 것이며, yield() 사용을 sleep() 사용 및 wakeup() 사용으로 대체해야 함 
+수면 대기열 sleep_list에 삽입해야 함. */
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+	int64_t start = timer_ticks (); // 현재 틱의 값을 반환
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	// while (timer_elapsed (start) < ticks) // timer_elapsed = 시작 이후 경과한 틱 수를 반환
+	// 	thread_yield (); // CPU의 수율을 산출하고 스레드를 ready_list에 삽입함
+
+	if(timer_elapsed (start) < ticks)
+		thread_sleep(start + ticks); // 구현해야 함
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,6 +132,14 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	/* 추가할 코드: 
+	수면 목록과 글로벌 틱을 확인합니다.
+	깨울 스레드를 찾습니다,
+	필요한 경우 준비 목록으로 이동합니다.
+	글로벌 틱을 업데이트합니다.
+	*/
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

@@ -49,24 +49,6 @@ sema_init (struct semaphore *sema, unsigned value) {
 	list_init (&sema->waiters);
 }
 
-bool
-sema_priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
-    struct semaphore_elem *sema_a = list_entry(a, struct semaphore_elem, elem);
-    struct semaphore_elem *sema_b = list_entry(b, struct semaphore_elem, elem);
-    
-    // 각 세마포어를 기다리는 스레드들 중 가장 높은 우선순위를 찾아서 비교
-    struct list_elem *max_a = list_max(&sema_a->semaphore.waiters, priority_more, NULL);
-    struct list_elem *max_b = list_max(&sema_b->semaphore.waiters, priority_more, NULL);
-    
-    if (max_a == NULL && max_b == NULL) return false;
-    if (max_a == NULL) return false;
-    if (max_b == NULL) return true;
-    
-    struct thread *thread_a = list_entry(max_a, struct thread, elem);
-    struct thread *thread_b = list_entry(max_b, struct thread, elem);
-    
-    return thread_a->priority > thread_b->priority;
-}
 
 /* 세마포어에 대한 "down" 또는 "P" 연산입니다.
    SEMA(세마포어 변수)의 값이 양수(0보다 커질 때)가 되기를 기다린 후,
@@ -131,10 +113,11 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
+	if (!list_empty (&sema->waiters)) {
 		list_sort (&sema->waiters, priority_more, NULL);
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
+	}
 	sema->value++;
 	intr_set_level (old_level);
 }
@@ -282,6 +265,33 @@ struct semaphore_elem {
 	struct semaphore semaphore;         /* This semaphore. */
 };
 
+bool
+sema_priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+    struct semaphore_elem *sema_a = list_entry(a, struct semaphore_elem, elem);
+    struct semaphore_elem *sema_b = list_entry(b, struct semaphore_elem, elem);
+    
+    // 각 세마포어를 기다리는 스레드의 우선순위를 직접 비교
+    // condition variable에서는 각 semaphore_elem당 하나의 대기 스레드만 있음
+    
+    if (list_empty(&sema_a->semaphore.waiters) && list_empty(&sema_b->semaphore.waiters)) {
+        return false; // 둘 다 비어있으면 순서 상관없음
+    }
+    
+    if (list_empty(&sema_a->semaphore.waiters)) {
+        return false; // a가 비어있으면 b가 우선
+    }
+    
+    if (list_empty(&sema_b->semaphore.waiters)) {
+        return true; // b가 비어있으면 a가 우선
+    }
+    
+    // 각 세마포어의 첫 번째(그리고 유일한) 대기 스레드의 우선순위 비교
+    struct thread *thread_a = list_entry(list_front(&sema_a->semaphore.waiters), struct thread, elem);
+    struct thread *thread_b = list_entry(list_front(&sema_b->semaphore.waiters), struct thread, elem);
+    
+    return thread_a->priority > thread_b->priority;
+}
+
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
    code to receive the signal and act upon it. */
@@ -343,10 +353,11 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (!intr_context ());
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (!list_empty (&cond->waiters))
+	if (!list_empty (&cond->waiters)) {
 		list_sort(&cond->waiters, sema_priority_more, NULL);
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
+	}
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by

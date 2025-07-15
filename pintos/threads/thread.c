@@ -209,6 +209,9 @@ tid_t thread_create(const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock(t);
 
+	/* 현재 실행 중인 스레드와 새로 삽입된 스레드의 우선순위를 비교합니다.
+	새로 들어오는 스레드의 우선순위가 더 높으면 CPU를 양보합니다. */
+
 	return tid;
 }
 

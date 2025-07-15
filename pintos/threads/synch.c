@@ -49,14 +49,16 @@ sema_init (struct semaphore *sema, unsigned value) {
 	list_init (&sema->waiters);
 }
 
-/* Down or "P" operation on a semaphore.  Waits for SEMA's value
-   to become positive and then atomically decrements it.
+/* 세마포어에 대한 "down" 또는 "P" 연산입니다.
+   SEMA(세마포어 변수)의 값이 양수(0보다 커질 때)가 되기를 기다린 후,
+   원자적으로(atomically) 그 값을 1 감소시킵니다.
 
-   This function may sleep, so it must not be called within an
-   interrupt handler.  This function may be called with
-   interrupts disabled, but if it sleeps then the next scheduled
-   thread will probably turn interrupts back on. This is
-   sema_down function. */
+   이 함수는 호출 시 프로세스(또는 스레드)가 대기 상태(sleep)에 빠질 수 있으므로,
+   인터럽트 핸들러 내부에서 호출해서는 안 됩니다.
+   인터럽트가 비활성화된 상태에서 이 함수를 호출할 수는 있지만,
+   만약 함수가 대기 상태에 들어가면 다음에 스케줄링되는 스레드가
+   아마도 인터럽트를 다시 활성화시킬 것입니다.
+   이것이 sema_down 함수입니다. */
 void
 sema_down (struct semaphore *sema) {
 	enum intr_level old_level;
@@ -99,10 +101,10 @@ sema_try_down (struct semaphore *sema) {
 	return success;
 }
 
-/* Up or "V" operation on a semaphore.  Increments SEMA's value
-   and wakes up one thread of those waiting for SEMA, if any.
+/* 세마포어에 대한 "up" 또는 "V" 연산입니다. SEMA(세마포어 변수)의 값을 1 증가시키고,
+   만약 SEMA를 기다리는 스레드가 있다면 그중 하나를 깨웁니다.
 
-   This function may be called from an interrupt handler. */
+   이 함수는 인터럽트 핸들러 내에서도 호출할 수 있습니다. */
 void
 sema_up (struct semaphore *sema) {
 	enum intr_level old_level;

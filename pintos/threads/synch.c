@@ -207,13 +207,30 @@ lock_init (struct lock *lock) {
    we need to sleep. */
 void
 lock_acquire (struct lock *lock) {
-	ASSERT (lock != NULL);
-	ASSERT (!intr_context ());
-	ASSERT (!lock_held_by_current_thread (lock));
-
+	/*
+	!수정 필요 
+	락을 사용할 수 없는 경우 락의 주소를 저장한다.
+	현재 우선순위를 저장하고 기부된 스레드를 목록에 유지한다.(다중 거부)
+	우선순위를 거부한다. 
+	 */
+	ASSERT (lock != NULL); /* 락이 널이 아닐때 실행되는 디버깅 */
+	ASSERT (!intr_context ()); /*문맥교환이 일어나지 않을 때 실행되는 디버깅*/
+	ASSERT (!lock_held_by_current_thread (lock)); /* 락이 되지 않았을때 */	
+	/* sudo */
+	struct thread *cur = thread_current(); /* 기부자 받기 */
+	if(lock->holder != NULL){ /* 락이 이미 점유 된 경우 */
+		cur->waiting_lock = lock; /* 현재스레드가 락 받기 */
+		/* lock holder 도네이션에 기부자의 정보기입 */
+		list_push_back(&lock->holder->donations, &cur->donations_elem);
+		donation_priority();
+	}
 	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+	/* 현재 락의 소유자를 현재 스레드로 설정 */
+	lock->holder = cur;
+	/* 더이상 락을 기다리지 않아도 됨 */
+	cur->waiting_lock = NULL;
 }
+
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current

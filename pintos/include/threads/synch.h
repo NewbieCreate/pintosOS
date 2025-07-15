@@ -4,7 +4,12 @@
 #include <list.h>
 #include <stdbool.h>
 
-/* A counting semaphore. */
+/*
+	카운팅 세마포어
+	카운터가 0 이상의 정수 값을 가질 수 있어, 여러 개의 동일한 자원을 관리할 때 사용
+	sema_down : 자원 획득 - 프로세스가 사용하고 있다.
+	sema_up : 자원 반납 - 프로세스가 사용을 마쳤다.
+*/
 struct semaphore {
 	unsigned value;             /* Current value. */
 	struct list waiters;        /* List of waiting threads. */

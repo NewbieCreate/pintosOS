@@ -726,3 +726,50 @@ void donation_priority(void)
 		t->priority = priority;
 	}
 }
+
+/* 스레드 정렬 함수 */
+bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux)
+{
+	return list_entry(l, struct thread, donations_elem)->priority > list_entry(s, struct thread, donations_elem)->priority;
+}
+
+/* 도네이션 리스트에서 스레드 들을 지우는 함수 */
+void remove_with_lock(struct  lock *lock)
+{
+	struct thread *cur = thread_current(); /* 현재 스레드를 반환 받아 넣는다.(기부받은 스레드) */
+	struct list_elem *e= list_begin(&cur->donations); /* elem을 돌 포인터 */
+	/* 기부받은 스레드를 돌면서 끝을 만날때 까지 돈다 */
+	while(e != list_end(&cur->donations)){
+		/* 리스트의 정보를 t포인터에 넣는다. */
+		struct thread *t = list_entry(e, struct thread, donations_elem);
+		struct list_elem *next = list_next(e); // 다음 노드를 미리 저장
+		/* 만약에 t가 락 상태라면 */
+		if (t->waiting_lock == lock){
+			/* 리스트에서 빼낸다. */
+			list_remove(&t->donations_elem);
+		}
+		e = next;
+	}
+}
+
+/* priority 재설정 함수 */
+void refresh_priority(void)
+{
+	/* 현재 실행중인 스레드를 불러 온다. */
+	struct thread *cur = thread_current();
+
+	/*현재 스레드의 우선순위를 init_priority에 저장한다. */
+	cur->priority = cur->init_priority;
+	/* 현재스레드의 도네이션이 비어있지 않았을 경우 */
+	if(!list_empty(&cur->donations)) {
+		/* 현재스레드의 도네이션 리스트를 우선순위 순서로 맞춘다. */
+		list_sort (&cur->donations, thread_compare_donate_priority, 0);
+		/* 우선순위가 높은 쓰레드 정보를 프론트에 넣는다. */
+		struct thread *front = list_entry(list_front(&cur->donations), struct thread, donations_elem);
+		/* 프론트 쓰레드가 현재 스레드보다 우선순위가 높을경우 */
+		if (front->priority > cur->priority){
+			/* 현재스레드는 프론트 스레드가 된다. */
+			cur->priority = front->priority;
+		}
+	}
+}

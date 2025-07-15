@@ -210,6 +210,14 @@ tid_t thread_create(const char *name, int priority,
 	// 준비된 상태로 변경 후 ready_list에 삽입
 	thread_unblock(t);
 
+	/* 
+		현재 실행 중인 스레드와 새로 삽입된 스레드의 우선순위를 비교합니다. 
+		새로 들어오는 스레드의 우선순위가 더 높으면 CPU를 양보합니다 
+	*/
+	struct thread *curr = thread_current();
+	if(curr->priority < priority)
+		thread_yield();
+
 	// 새로 생성된 스레드의 tid 반환
 	return tid;
 }
@@ -229,7 +237,7 @@ void thread_block(void)
 
 
 // 우선순위 정렬
-bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aus UNUSED){
+bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
 	struct thread *t1 = list_entry(a, struct thread, elem);
 	struct thread *t2 = list_entry(b, struct thread, elem);
 
@@ -336,7 +344,7 @@ void thread_yield(void)
 	// idle_thread(유효 스레드)는 ready_list에 들어가지 않음
 	// 현재 스레드를 ready_list에 추가
 	if (curr != idle_thread) 
-		list_push_back(&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem, priority_more, NULL);
 
 	// 스레드 상태를 READY로 바꾸고 스케줄러 호출
 	do_schedule(THREAD_READY);

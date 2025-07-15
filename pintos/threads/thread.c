@@ -413,6 +413,19 @@ void thread_set_priority(int new_priority)
 {
 	// 현재 스레드의 priority를 매개 변수 new_priority로 설정
 	thread_current()->priority = new_priority;
+
+	/*
+		현재 스레드보다 더 높은 우선 순위가 ready_list에 존재하면 양보
+	*/
+	// enum intr_level old_level = intr_disable();
+	if(!list_empty(&ready_list)){
+		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
+
+		if(thread_current()->priority < t->priority){
+			thread_yield();
+		}
+	}
+	// intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */

@@ -231,7 +231,7 @@ void thread_block(void)
 
 
 // 우선순위 정렬
-bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aus UNUSED){
+bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
 	struct thread *t1 = list_entry(a, struct thread, elem);
 	struct thread *t2 = list_entry(b, struct thread, elem);
 

@@ -86,21 +86,21 @@ typedef int tid_t;
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
 struct thread {
-	/* Owned by thread.c. */
-	tid_t tid;                          /* Thread identifier. */
-	enum thread_status status;          /* Thread state. */
-	char name[16];                      /* Name (for debugging purposes). */
-	int priority;                       /* Priority. */
+	tid_t tid;                           
+	enum thread_status status;          
+	char name[16];                      
+	int64_t wakeup_tick; 
 
-	int64_t wakeup_tick; // 로컬 틱을 위한 새 필드, 깨어날 시간
+	int priority; 
+	
+	/* 우선순위 기부 하기 위한 선언부 */
+	int init_priority;                  /* 원래의 우선순위(donate 이전 값 유지) */
+	struct list donations;              /* 기부 받은 스레드들 리스트 */
+	struct list_elem donations_elem;    /* 다른스레드에 기부했을때 들어가는 정보*/
+	struct lock *waiting_lock;           /* 현재 기다리는 락(추적용) */
+ 
+	struct list_elem elem;             
 
-	/* Shared between thread.c and synch.c. */
-	struct list_elem elem;              /* List element. */
-	
-	struct list donations;
-	struct list_elem donations_elem;
-	struct lock *waiting_lock;
-	
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -111,7 +111,7 @@ struct thread {
 #endif
 
 	/* Owned by thread.c. */
-	struct intr_frame tf;               /* Information for switching */
+	struct intr_frame tf;               /* 스위칭을 위한 정보 */  
 	unsigned magic;                     /* Detects stack overflow. */
 };
 
@@ -138,7 +138,6 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
-bool priority_more (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
@@ -149,7 +148,12 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
-
 bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+/* 우선순위 함수 추가 */
+void donation_priority(void);
+bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux);
+void remove_with_lock(struct  lock *lock);
+void refresh_priority(void);
 
 #endif /* threads/thread.h */

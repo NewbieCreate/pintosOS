@@ -712,3 +712,17 @@ allocate_tid(void)
 
 	return tid;
 }
+
+void donation_priority(void)
+{
+	struct thread *t = thread_current();
+	int priority = t->priority;
+	int depth =0;
+
+	for(depth =0; depth < 8; depth++)
+	{
+		if(t->waiting_lock == NULL) break;
+		t = t->waiting_lock->holder;
+		t->priority = priority;
+	}
+}

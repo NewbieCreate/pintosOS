@@ -248,6 +248,25 @@ bool priority_more(const struct list_elem *a, const struct list_elem *b, void *a
 	return t1->priority > t2->priority;
 }
 
+bool thread_compare_priority(struct list_elem *l, struct list_elem *s, void *aux)
+{
+	return list_entry(l, struct thread, elem)->priority > list_entry(s, struct thread, elem)->priority;
+}
+
+/* 세마비교 */
+bool
+sema_compare_priority (const struct list_elem *l, const struct list_elem *s, void *aux)
+{
+	struct semaphore_elem *l_sema = list_entry (l, struct semaphore_elem, elem);
+	struct semaphore_elem *s_sema = list_entry(s, struct semaphore_elem, elem);
+
+	struct list *waiter_i_sema = &(l_sema->semaphore.waiters);
+	struct list *waiter_s_sema = &(s_sema->semaphore.waiters);
+
+	return list_entry(list_begin(waiter_i_sema), struct thread, elem)->priority >list_entry(list_begin(waiter_s_sema),struct thread, elem)->priority;
+
+}
+
 /* 
 	차단(blocked)된 스레드 T를 실행 준비(ready-to-run) 상태로 전환합니다. 
 	만약 T가 차단된 상태가 아니라면 오류입니다. (현재 실행 중인 스레드를 준비 상태로 만들려면 thread_yield()를 사용하세요.)
@@ -270,7 +289,7 @@ void thread_unblock(struct thread *t)
 	// 준비된 리스트의 맨 뒤에 스레드 삽입
 	//list_push_back(&ready_list, &t->elem);
 
-	list_insert_ordered(&ready_list, &t->elem, priority_more, NULL);
+	list_insert_ordered(&ready_list, &t->elem, thread_compare_priority, 0);
 
 	// 스레드 상태를 READY로 변경
 	t->status = THREAD_READY;
@@ -348,7 +367,7 @@ void thread_yield(void)
 	// idle_thread(유효 스레드)는 ready_list에 들어가지 않음
 	// 현재 스레드를 ready_list에 추가
 	if (curr != idle_thread) 
-		list_insert_ordered(&ready_list, &curr->elem, priority_more, NULL);
+		list_insert_ordered(&ready_list, &curr->elem, thread_compare_priority, 0);
 
 	// 스레드 상태를 READY로 바꾸고 스케줄러 호출
 	do_schedule(THREAD_READY);
@@ -377,39 +396,37 @@ void thread_sleep(int64_t ticks)
 	필요한 경우 글로벌 틱을 업데이트합니다,
 	그리고 schedule() 을 호출합니다.*/
 	/* 스레드 목록을 조작할 때는 인터럽트를 비활성화하세요! */
-	enum intr_level old_level = intr_disable(); // 인터럽트 비활성화
+	enum intr_level old_level; // 인터럽트 비활성화
 
-	struct thread *curr = thread_current(); // 현재 스레드
-	if (curr != idle_thread)
-	{											   // 현재 스레드가 유후 스레드가 아닌 경우
-		curr->wakeup_tick = ticks; // 매개변수로 받은 시간
+	struct thread *curr; // 현재 스레드
+	old_level = intr_disable();
+	curr = thread_current();
 
-		//list_push_back(&sleep_list, &curr->elem); // 맨 뒤에 삽입
-		list_insert_ordered (&sleep_list, &curr->elem, check_struct, NULL);
+	curr->wakeup_tick = ticks; // 매개변수로 받은 시간
 
-		thread_block();
-		//curr->status = THREAD_BLOCKED; // 현재 스레드 상태를 BLOCKED로 변경
+	//list_push_back(&sleep_list, &curr->elem); // 맨 뒤에 삽입
+	list_insert_ordered (&sleep_list, &curr->elem, check_struct, NULL);
 
-		//schedule(); // schedule() 호출
-	}
-
+	thread_block();
+	
 	intr_set_level(old_level); // 인터럽트 복원
 }
 
 void thread_wakeup(int64_t current_ticks)
 {
-	// 정렬된 리스트이므로 앞에서부터 처리
-    while (!list_empty(&sleep_list)) {
-        struct list_elem *e = list_front(&sleep_list);
-        struct thread *t = list_entry(e, struct thread, elem);
-        
-        if (t->wakeup_tick <= current_ticks) {
-            list_pop_front(&sleep_list);  // ✓ 여기서는 pop_front가 적절
-            thread_unblock(t);
-        } else {
-            break;  // 정렬되어 있으므로 더 이상 확인 불필요
-        }
-    }
+	struct list_elem *e = list_begin(&sleep_list);
+	while (e != list_end(&sleep_list))
+	{
+		struct thread *t = list_entry(e, struct thread, elem);
+		if (t->wakeup_tick <= current_ticks)
+		{
+			e = list_remove(e);
+			thread_unblock(t);
+		}
+		else{
+			e = list_next(e);
+		}
+	}
 }
 
 int get_effective_priority(struct thread *t){
@@ -438,7 +455,7 @@ int get_effective_priority(struct thread *t){
 void thread_set_priority(int new_priority)
 {
 	// 현재 스레드의 priority를 매개 변수 new_priority로 설정
-	thread_current()->priority = new_priority;
+	thread_current()->init_priority = new_priority;
 
 	// /*
 	// 	현재 스레드보다 더 높은 우선 순위가 ready_list에 존재하면 양보
@@ -748,15 +765,15 @@ allocate_tid(void)
 
 void donation_priority(void)
 {
-	struct thread *t = thread_current();
-	int priority = t->priority;
-	int depth =0;
+	int depth;
+	struct thread *cur = thread_current();
 
-	for(depth =0; depth < 8; depth++)
+	for(depth = 0; depth < 8; depth ++) /* 최대 깊이는 8이여야함 */
 	{
-		if(t->waiting_lock == NULL) break;
-		t = t->waiting_lock->holder;
-		t->priority = priority;
+		if(!cur->waiting_lock) break;
+		struct thread *holder = cur->waiting_lock->holder;
+		holder->priority = cur->priority;
+		cur = holder;
 	}
 }
 
@@ -769,19 +786,15 @@ bool thread_compare_donate_priority(const struct list_elem *l, const struct list
 /* 도네이션 리스트에서 스레드 들을 지우는 함수 */
 void remove_with_lock(struct  lock *lock)
 {
-	struct thread *cur = thread_current(); /* 현재 스레드를 반환 받아 넣는다.(기부받은 스레드) */
-	struct list_elem *e= list_begin(&cur->donations); /* elem을 돌 포인터 */
-	/* 기부받은 스레드를 돌면서 끝을 만날때 까지 돈다 */
-	while(e != list_end(&cur->donations)){
-		/* 리스트의 정보를 t포인터에 넣는다. */
-		struct thread *t = list_entry(e, struct thread, donations_elem);
-		struct list_elem *next = list_next(e); // 다음 노드를 미리 저장
-		/* 만약에 t가 락 상태라면 */
-		if (t->waiting_lock == lock){
-			/* 리스트에서 빼낸다. */
+	struct list_elem *e;
+	struct thread *cur = thread_current();
+
+	for(e=list_begin(&cur->donations); e != list_end(&cur->donations); e=list_next(e))
+	{
+		struct thread *t = list_entry(e,struct thread, donations_elem);
+		if(t->waiting_lock == lock){
 			list_remove(&t->donations_elem);
 		}
-		e = next;
 	}
 }
 

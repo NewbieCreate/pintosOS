@@ -44,11 +44,13 @@ test_priority_donate_multiple (void)
        PRI_DEFAULT + 2, thread_get_priority ());
 
   lock_release (&b);
+   thread_yield();
   msg ("Thread b should have just finished.");
   msg ("Main thread should have priority %d.  Actual priority: %d.",
        PRI_DEFAULT + 1, thread_get_priority ());
 
   lock_release (&a);
+  thread_yield();
   msg ("Thread a should have just finished.");
   msg ("Main thread should have priority %d.  Actual priority: %d.",
        PRI_DEFAULT, thread_get_priority ());
@@ -62,6 +64,7 @@ a_thread_func (void *lock_)
   lock_acquire (lock);
   msg ("Thread a acquired lock a.");
   lock_release (lock);
+  thread_yield ();
   msg ("Thread a finished.");
 }
 
@@ -73,5 +76,6 @@ b_thread_func (void *lock_)
   lock_acquire (lock);
   msg ("Thread b acquired lock b.");
   lock_release (lock);
+  thread_yield ();
   msg ("Thread b finished.");
 }

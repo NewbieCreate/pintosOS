@@ -4,17 +4,31 @@
 #include <list.h>
 #include <stdbool.h>
 
-/* A counting semaphore. */
+/*
+	카운팅 세마포어
+	카운터가 0 이상의 정수 값을 가질 수 있어, 여러 개의 동일한 자원을 관리할 때 사용
+	sema_down : 자원 획득 - 프로세스가 사용하고 있다.
+	sema_up : 자원 반납 - 프로세스가 사용을 마쳤다.
+*/
 struct semaphore {
 	unsigned value;             /* Current value. */
 	struct list waiters;        /* List of waiting threads. */
 };
+
+/* 세마포어 요소추가  */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
+
 
 void sema_init (struct semaphore *, unsigned value);
 void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);
 void sema_up (struct semaphore *);
 void sema_self_test (void);
+bool sema_priority_more(const struct list_elem *a, const struct list_elem *b, void *aux);
+void donation_priority(void);
 
 /* Lock. */
 struct lock {

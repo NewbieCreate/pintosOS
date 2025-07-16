@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "synch.h": "c",
+        "thread.h": "c",
+        "flags.h": "c",
+        "serial.h": "c",
+        "intr-stubs.h": "c",
+        "vaddr.h": "c",
+        "interrupt.h": "c",
+        "random": "c"
+    }
+}

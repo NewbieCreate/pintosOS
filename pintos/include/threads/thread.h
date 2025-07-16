@@ -114,6 +114,9 @@ struct thread {
 	struct intr_frame tf;               /* 스위칭을 위한 정보 */  
 	unsigned magic;                     /* Detects stack overflow. */
 };
+/*쓰레드 함수선언*/
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t current_ticks);
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -149,6 +152,8 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+
 
 /* 우선순위 함수 추가 */
 void donation_priority(void);

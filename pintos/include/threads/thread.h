@@ -150,6 +150,10 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
+/*쓰레드 함수선언*/
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+
 /* 우선순위 함수 추가 */
 void donation_priority(void);
 bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux);

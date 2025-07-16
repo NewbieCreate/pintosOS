@@ -15,6 +15,13 @@ struct semaphore {
 	struct list waiters;        /* List of waiting threads. */
 };
 
+/* 세마포어 요소추가  */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
+
+
 void sema_init (struct semaphore *, unsigned value);
 void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);

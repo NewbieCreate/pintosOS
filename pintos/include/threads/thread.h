@@ -153,6 +153,12 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 bool priority_more(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
+/* 우선순위 명령어 */
+bool thread_compare_priority(struct list_elem *l, struct list_elem *s, void *aux);
+void thread_test_preemption(void);
+
+/* 세마추가 명령어 */
+bool sema_compare_priority (const struct list_elem *l, const struct list_elem *s, void *aux);
 
 
 /* 우선순위 함수 추가 */
@@ -160,5 +166,7 @@ void donation_priority(void);
 bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux);
 void remove_with_lock(struct  lock *lock);
 void refresh_priority(void);
+
+
 
 #endif /* threads/thread.h */

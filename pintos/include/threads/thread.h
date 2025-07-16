@@ -160,5 +160,6 @@ void donation_priority(void);
 bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux);
 void remove_with_lock(struct  lock *lock);
 void refresh_priority(void);
+int get_effective_priority(struct thread *t);
 
 #endif /* threads/thread.h */

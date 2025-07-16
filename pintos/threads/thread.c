@@ -172,6 +172,13 @@ void thread_print_stats(void)
 순서를 보장해야 한다면 세마포어 또는 다른 형태의 동기화를 사용하세요.
 제공된 코드는 새 스레드의 'priority' 멤버를 PRIORITY로 설정하지만, 실제 우선순위 스케줄링은 구현되어 있지 않습니다. 
 우선순위 스케줄링은 문제 1-3의 목표입니다. */
+void thread_test_preemption(void)
+{
+	if (!list_empty(&ready_list) && thread_current()->priority 
+        < list_entry(list_front(&ready_list), struct thread, elem)->priority)
+        thread_yield();
+}
+
 tid_t thread_create(const char *name, int priority,
 					thread_func *function, void *aux)
 {
@@ -214,10 +221,7 @@ tid_t thread_create(const char *name, int priority,
 		현재 실행 중인 스레드와 새로 삽입된 스레드의 우선순위를 비교합니다. 
 		새로 들어오는 스레드의 우선순위가 더 높으면 CPU를 양보합니다 
 	*/
-	struct thread *curr = thread_current();
-	if(curr->priority < priority)
-		thread_yield();
-
+    thread_test_preemption();
 	// 새로 생성된 스레드의 tid 반환
 	return tid;
 }
@@ -408,24 +412,48 @@ void thread_wakeup(int64_t current_ticks)
     }
 }
 
+int get_effective_priority(struct thread *t){
+	// 1. dontaions가 비었을 경우
+	if(list_empty(&t->donations))
+		return t->priority;
+		
+	// 2. 변수 새로이 설정
+	int max_priority = t->priority;
+	
+	// 3. dotaions 순회하며 max_priority 업데이트
+	struct list_elem *e;
+	for (e = list_begin (&t->donations); e != list_end (&t->donations); e = list_next (e)){
+		struct thread *donor = list_entry(e, struct thread, donations_elem);
+
+		int donor_effective_priority = get_effective_priority(donor);
+
+		if(max_priority < donor_effective_priority){
+			max_priority = donor_effective_priority;
+		}
+	}
+	return max_priority;
+}
+
 /* 현재 스레드의 우선순위를 NEW_PRIORITY로 설정 */
 void thread_set_priority(int new_priority)
 {
 	// 현재 스레드의 priority를 매개 변수 new_priority로 설정
 	thread_current()->priority = new_priority;
 
-	/*
-		현재 스레드보다 더 높은 우선 순위가 ready_list에 존재하면 양보
-	*/
+	// /*
+	// 	현재 스레드보다 더 높은 우선 순위가 ready_list에 존재하면 양보
+	// */
 	// enum intr_level old_level = intr_disable();
-	if(!list_empty(&ready_list)){
-		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
+	// if(!list_empty(&ready_list)){
+	// 	struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
 
-		if(thread_current()->priority < t->priority){
-			thread_yield();
-		}
-	}
+	// 	if(get_effective_priority(thread_current()) < get_effective_priority(t)){
+	// 		thread_yield();
+	// 	}
+	// }
 	// intr_set_level(old_level);
+	refresh_priority();
+	thread_test_preemption();
 }
 
 /* Returns the current thread's priority. */
@@ -526,6 +554,11 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	/* 도네이션 초기화 */
+	t->init_priority = priority;
+	t->waiting_lock = NULL;
+	list_init(&t->donations);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

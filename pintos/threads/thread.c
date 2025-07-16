@@ -443,15 +443,15 @@ void thread_set_priority(int new_priority)
 	/*
 		현재 스레드보다 더 높은 우선 순위가 ready_list에 존재하면 양보
 	*/
-	// enum intr_level old_level = intr_disable();
+	enum intr_level old_level = intr_disable();
 	if(!list_empty(&ready_list)){
 		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
 
-		if(thread_current()->priority < t->priority){
+		if(get_effective_priority(thread_current()) < get_effective_priority(t)){
 			thread_yield();
 		}
 	}
-	// intr_set_level(old_level);
+	intr_set_level(old_level);
 }
 
 

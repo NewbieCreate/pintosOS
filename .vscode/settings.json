@@ -6,6 +6,7 @@
         "serial.h": "c",
         "intr-stubs.h": "c",
         "vaddr.h": "c",
-        "interrupt.h": "c"
+        "interrupt.h": "c",
+        "random": "c"
     }
 }
